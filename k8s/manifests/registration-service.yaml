@@ -1,0 +1,73 @@
+---
+# Registration Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registration-service
+  namespace: facebibble
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: registration-service
+  template:
+    metadata:
+      labels:
+        app: registration-service
+    spec:
+      containers:
+      - name: registration-service
+        image: registrationservice:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+# Registration Service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: registration-service
+  namespace: facebibble
+spec:
+  selector:
+    app: registration-service
+  ports:
+  - port: 8080
+    targetPort: 8080
+---
+# Registration Service Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: registration-service-hpa
+  namespace: facebibble
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: registration-service
+  minReplicas: 1
+  maxReplicas: 8
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

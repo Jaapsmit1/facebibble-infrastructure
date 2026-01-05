@@ -1,0 +1,73 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: facebibble-ingress
+  namespace: facebibble
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      # Post Service - both cases for compatibility
+      - path: /api/Post
+        pathType: Prefix
+        backend:
+          service:
+            name: post-service
+            port:
+              number: 5000
+      - path: /api/post
+        pathType: Prefix
+        backend:
+          service:
+            name: post-service
+            port:
+              number: 5000
+      
+      # Comment Service - both cases
+      - path: /api/Comment
+        pathType: Prefix
+        backend:
+          service:
+            name: comment-service
+            port:
+              number: 8080
+      - path: /api/comment
+        pathType: Prefix
+        backend:
+          service:
+            name: comment-service
+            port:
+              number: 8080
+      
+      # Registration Service - both cases
+      - path: /api/Registration
+        pathType: Prefix
+        backend:
+          service:
+            name: registration-service
+            port:
+              number: 8080
+      - path: /api/registration
+        pathType: Prefix
+        backend:
+          service:
+            name: registration-service
+            port:
+              number: 8080
+      
+      # User Management Service - both cases
+      - path: /api/User
+        pathType: Prefix
+        backend:
+          service:
+            name: user-management-service
+            port:
+              number: 8080
+      - path: /api/user
+        pathType: Prefix
+        backend:
+          service:
+            name: user-management-service
+            port:
+              number: 8080

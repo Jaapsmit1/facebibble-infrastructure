@@ -1,0 +1,245 @@
+version: '3.8'
+
+networks:
+  backend:
+
+services:
+  # -----------------------------
+  # Keycloak DB (Postgres)
+  # -----------------------------
+  keycloak-db:
+    image: postgres:15
+    container_name: keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5434:5432"
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  # -----------------------------
+  # Keycloak Identity Provider
+  # -----------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.3
+    container_name: keycloak
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-db
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: secret
+    command: start-dev
+    ports:
+      - "8080:8080"
+    networks:
+      - backend
+    depends_on:
+      - keycloak-db
+
+  # -----------------------------
+  # MongoDB for Post Service
+  # -----------------------------
+  mongodb-post:
+    image: mongo:6.0
+    container_name: postservice-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+      MONGO_INITDB_DATABASE: PostServiceDb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-post-data:/data/db
+    networks:
+      - backend
+
+  # -----------------------------
+  # MongoDB for Comment Service
+  # -----------------------------
+  mongodb-comment:
+    image: mongo:6.0
+    container_name: commentservice-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+      MONGO_INITDB_DATABASE: CommentServiceDb
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-comment-data:/data/db
+    networks:
+      - backend
+
+  # -----------------------------
+  # Apache Kafka (KRaft mode - no Zookeeper)
+  # -----------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9094,PLAINTEXT_HOST://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9094
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    networks:
+      - backend
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    networks:
+      - backend
+
+  # -----------------------------
+  # Skeleton API
+  # -----------------------------
+  skeletonapi:
+    build:
+      context: ./Skeleton-service/SkeletonService/SkeletonService
+      dockerfile: Dockerfile
+    image: skeletonapi
+    networks:
+      - backend
+    ports:
+      - "8002:8080"
+
+  # -----------------------------
+  # Post API
+  # -----------------------------
+  postapi:
+    build:
+      context: ./Post-service/PostService/PostService
+      dockerfile: Dockerfile
+    image: postapi
+    networks:
+      - backend
+    ports:
+      - "8003:5000" # map HTTP 5000 inside container to 8003 on host
+    depends_on:
+      - mongodb-post
+      - kafka
+    environment:
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ConnectionStrings__MongoDb=mongodb://root:example@mongodb-post:27017
+      - MongoDbDatabase=PostServiceDb
+      - Kafka__BootstrapServers=kafka:9092
+
+  # -----------------------------
+  # Comment API
+  # -----------------------------
+  commentapi:
+    build:
+      context: ./Comment-service/Comment-service
+      dockerfile: Dockerfile
+    image: commentapi
+    networks:
+      - backend
+    ports:
+      - "8005:8080"
+    depends_on:
+      - mongodb-comment
+      - kafka
+    environment:
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ConnectionStrings__MongoDb=mongodb://root:example@mongodb-comment:27017
+      - MongoDbDatabase=CommentServiceDb
+      - Kafka__BootstrapServers=kafka:9092
+
+  # -----------------------------
+  # Registration Service
+  # -----------------------------
+  registrationservice:
+    build:
+      context: ./RegistrationService/RegistrationService
+      dockerfile: Dockerfile
+    image: registrationservice
+    networks:
+      - backend
+    ports:
+      - "8001:8080"
+    depends_on:
+      - keycloak
+    environment:
+      - Keycloak__Url=http://keycloak:8080
+      - Keycloak__PublicUrl=http://localhost:8080
+      - Keycloak__Realm=facebibble
+      - Keycloak__ClientId=facebibble-api
+      - Keycloak__AdminUsername=admin
+      - Keycloak__AdminPassword=admin
+
+  # -----------------------------
+  # API Gateway
+  # -----------------------------
+  apigateway:
+    build:
+      context: ./Api-Gateway/ApiGateway/ApiGateway
+      dockerfile: Dockerfile
+    image: apigateway
+    environment:
+      - Keycloak__Url=http://keycloak:8080
+      - Keycloak__PublicUrl=http://localhost:8080
+      - Keycloak__Realm=facebibble
+      - Keycloak__ClientId=facebibble-api
+    networks:
+      - backend
+    ports:
+      - "8004:8080"
+    depends_on:
+      - keycloak
+      - usermanagement
+      - postapi
+      - registrationservice
+
+  # -----------------------------
+  # User Management
+  # -----------------------------
+  usermanagement:
+    build:
+      context: ./UserManagement-service/UserManagementService/UserManagementService
+      dockerfile: Dockerfile
+    image: usermanagement
+    networks:
+      - backend
+    ports:
+      - "8006:8080"
+    depends_on:
+      - keycloak
+      - kafka
+    environment:
+      - Keycloak__Url=http://keycloak:8080
+      - Keycloak__PublicUrl=http://localhost:8080
+      - Keycloak__Realm=facebibble
+      - Keycloak__ClientId=facebibble-api
+      - Keycloak__ClientSecret=YOUR_CLIENT_SECRET
+      - Kafka__BootstrapServers=kafka:9092
+
+volumes:
+  keycloak-db-data:
+  mongo-post-data:
+  mongo-comment-data:

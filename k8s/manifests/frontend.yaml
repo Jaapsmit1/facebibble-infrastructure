@@ -1,0 +1,59 @@
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: facebibble
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30000
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: facebibble
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: jaapsmit1/facebibble-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: NEXT_PUBLIC_API_GATEWAY_URL
+          value: "http://api-gateway:8001"
+        - name: NEXT_PUBLIC_KEYCLOAK_URL
+          value: "http://keycloak:8080"
+        - name: NEXT_PUBLIC_USER_MANAGEMENT_URL
+          value: "http://user-management-service:8002/api/UserManagement"
+        - name: NEXT_PUBLIC_POST_SERVICE_URL
+          value: "http://post-service:8003/api/Post"
+        - name: NEXT_PUBLIC_COMMENT_SERVICE_URL
+          value: "http://comment-service:8004/api/Comment"
+        - name: NEXT_PUBLIC_REGISTRATION_URL
+          value: "http://registration-service:8005/api/Registration"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

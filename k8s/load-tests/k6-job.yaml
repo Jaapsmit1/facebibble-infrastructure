@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k6-test-script
+  namespace: facebibble
+data:
+  stress-test.js: |
+    import http from 'k6/http';
+    import { check, sleep } from 'k6';
+
+    export let options = {
+      stages: [
+        { duration: '1m', target: 100 },   // Ramp up to 100 users
+        { duration: '2m', target: 500 },   // Ramp up to 500 users
+        { duration: '2m', target: 1000 },  // Ramp up to 1000 users
+        { duration: '2m', target: 1200 },  // Peak at 1200 users (hold to reach max pods)
+        { duration: '3m', target: 600 },   // Scale down to 600 (60s wait + pods removed)
+        { duration: '3m', target: 200 },   // Scale down to 200 (more visible decrease)
+        { duration: '2m', target: 50 },    // Scale down to 50 (approaching min)
+        { duration: '1m', target: 0 },     // Scale down to 0
+      ],
+      thresholds: {
+        'http_req_duration': ['p(99)<1000'],
+        'http_req_failed': ['rate<0.05'],
+      },
+    };
+
+    export default function () {
+      // Using internal Kubernetes service name - no external networking!
+      const response = http.get('http://post-service.facebibble.svc.cluster.local:5000/api/Post');
+      
+      check(response, {
+        'status is 200': (r) => r.status === 200,
+      });
+      
+      sleep(Math.random() * 2 + 0.5); // Sleep 0.5-2.5 seconds
+    }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6-load-test
+  namespace: facebibble
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: k6
+        image: grafana/k6:latest
+        command: ["k6", "run", "/scripts/stress-test.js"]
+        volumeMounts:
+        - name: k6-test-script
+          mountPath: /scripts
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "300m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+      - name: k6-test-script
+        configMap:
+          name: k6-test-script

@@ -1,0 +1,196 @@
+---
+# MongoDB Secret for Post Service
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-post-secret
+  namespace: facebibble
+type: Opaque
+stringData:
+  username: postuser
+  password: postpass123
+  root-password: rootpass123
+---
+# Post Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: post-service
+  namespace: facebibble
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: post-service
+  template:
+    metadata:
+      labels:
+        app: post-service
+    spec:
+      containers:
+      - name: post-service
+        image: postapi:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5000
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: DOTNET_RUNNING_IN_CONTAINER
+          value: "true"
+        - name: MONGO_USERNAME
+          value: root
+        - name: MONGO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-post-secret
+              key: root-password
+        - name: ConnectionStrings__MongoDb
+          value: "mongodb://$(MONGO_USERNAME):$(MONGO_PASSWORD)@mongodb-post:27017/PostServiceDb?authSource=admin"
+        - name: MongoDbDatabase
+          value: "PostServiceDb"
+        - name: Kafka__BootstrapServers
+          value: "kafka:9092"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        readinessProbe:
+          httpGet:
+            path: /api/Post
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/Post
+            port: 5000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+      terminationGracePeriodSeconds: 30
+---
+# Post Service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: post-service
+  namespace: facebibble
+spec:
+  selector:
+    app: post-service
+  ports:
+  - port: 5000
+    targetPort: 5000
+---
+# Post Service Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: post-service-hpa
+  namespace: facebibble
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: post-service
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60  # Wait 60 seconds before scaling down (default is 300)
+      policies:
+      - type: Percent
+        value: 50  # Remove up to 50% of pods at once
+        periodSeconds: 60
+      - type: Pods
+        value: 2  # Remove up to 2 pods at once
+        periodSeconds: 60
+      selectPolicy: Max  # Use the policy that removes more pods
+    scaleUp:
+      stabilizationWindowSeconds: 0  # Scale up immediately
+      policies:
+      - type: Percent
+        value: 100  # Double the pods at once
+        periodSeconds: 30
+      - type: Pods
+        value: 4  # Add up to 4 pods at once
+        periodSeconds: 30
+      selectPolicy: Max  # Use the policy that adds more pods
+---
+# MongoDB for Posts
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb-post
+  namespace: facebibble
+spec:
+  serviceName: mongodb-post
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-post
+  template:
+    metadata:
+      labels:
+        app: mongodb-post
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:6.0
+        ports:
+        - containerPort: 27017
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          value: root
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-post-secret
+              key: root-password
+        - name: MONGO_INITDB_DATABASE
+          value: PostServiceDb
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+---
+# MongoDB Post Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-post
+  namespace: facebibble
+spec:
+  clusterIP: None
+  selector:
+    app: mongodb-post
+  ports:
+  - port: 27017
+    targetPort: 27017

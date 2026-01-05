@@ -1,0 +1,175 @@
+---
+# MongoDB Secret for Comment Service
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-comment-secret
+  namespace: facebibble
+type: Opaque
+stringData:
+  username: commentuser
+  password: commentpass123
+  root-password: rootpass123
+---
+# Comment Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: comment-service
+  namespace: facebibble
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: comment-service
+  template:
+    metadata:
+      labels:
+        app: comment-service
+    spec:
+      containers:
+      - name: comment-service
+        image: commentapi:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: DOTNET_RUNNING_IN_CONTAINER
+          value: "true"
+        - name: MONGO_USERNAME
+          value: root
+        - name: MONGO_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-comment-secret
+              key: root-password
+        - name: ConnectionStrings__MongoDb
+          value: "mongodb://$(MONGO_USERNAME):$(MONGO_PASSWORD)@mongodb-comment:27017/CommentServiceDb?authSource=admin"
+        - name: MongoDbDatabase
+          value: "CommentServiceDb"
+        - name: Kafka__BootstrapServers
+          value: "kafka:9092"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /api/Comment
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/Comment
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 15"]
+      terminationGracePeriodSeconds: 30
+---
+# Comment Service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: comment-service
+  namespace: facebibble
+spec:
+  selector:
+    app: comment-service
+  ports:
+  - port: 8080
+    targetPort: 8080
+---
+# Comment Service Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: comment-service-hpa
+  namespace: facebibble
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: comment-service
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+# MongoDB for Comments
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb-comment
+  namespace: facebibble
+spec:
+  serviceName: mongodb-comment
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-comment
+  template:
+    metadata:
+      labels:
+        app: mongodb-comment
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:6.0
+        ports:
+        - containerPort: 27017
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          value: root
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-comment-secret
+              key: root-password
+        - name: MONGO_INITDB_DATABASE
+          value: CommentServiceDb
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+---
+# MongoDB Comment Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-comment
+  namespace: facebibble
+spec:
+  clusterIP: None
+  selector:
+    app: mongodb-comment
+  ports:
+  - port: 27017
+    targetPort: 27017

@@ -1,0 +1,96 @@
+---
+# MongoDB for Post Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-post
+  namespace: facebibble
+spec:
+  selector:
+    app: mongodb-post
+  ports:
+    - port: 27017
+      targetPort: 27017
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb-post
+  namespace: facebibble
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-post
+  template:
+    metadata:
+      labels:
+        app: mongodb-post
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:6.0
+        ports:
+        - containerPort: 27017
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          value: "root"
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          value: "example"
+        - name: MONGO_INITDB_DATABASE
+          value: "PostServiceDb"
+        volumeMounts:
+        - name: mongo-storage
+          mountPath: /data/db
+      volumes:
+      - name: mongo-storage
+        emptyDir: {}
+---
+# MongoDB for Comment Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-comment
+  namespace: facebibble
+spec:
+  selector:
+    app: mongodb-comment
+  ports:
+    - port: 27017
+      targetPort: 27017
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb-comment
+  namespace: facebibble
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-comment
+  template:
+    metadata:
+      labels:
+        app: mongodb-comment
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:6.0
+        ports:
+        - containerPort: 27017
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          value: "root"
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          value: "example"
+        - name: MONGO_INITDB_DATABASE
+          value: "CommentServiceDb"
+        volumeMounts:
+        - name: mongo-storage
+          mountPath: /data/db
+      volumes:
+      - name: mongo-storage
+        emptyDir: {}
