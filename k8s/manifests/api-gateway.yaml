@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: api-gateway
-        image: apigateway:latest
-        imagePullPolicy: Never
+        image: jaapsmit/facebibble-api-gateway:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
         resources:

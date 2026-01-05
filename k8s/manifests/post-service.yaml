@@ -29,8 +29,8 @@ spec:
     spec:
       containers:
       - name: post-service
-        image: postapi:latest
-        imagePullPolicy: Never
+        image: jaapsmit/facebibble-post-service:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
         env:

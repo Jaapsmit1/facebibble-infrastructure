@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: user-management-service
-        image: usermanagement:latest
-        imagePullPolicy: Never
+        image: jaapsmit/facebibble-user-management:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
         env:

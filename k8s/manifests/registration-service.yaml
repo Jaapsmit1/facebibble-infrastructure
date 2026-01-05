@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: registration-service
-        image: registrationservice:latest
-        imagePullPolicy: Never
+        image: jaapsmit/facebibble-user-management:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
         env:

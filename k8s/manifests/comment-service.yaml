@@ -29,8 +29,8 @@ spec:
     spec:
       containers:
       - name: comment-service
-        image: commentapi:latest
-        imagePullPolicy: Never
+        image: jaapsmit/facebibble-comment-service:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8080
         env:
