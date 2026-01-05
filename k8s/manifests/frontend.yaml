@@ -39,17 +39,17 @@ spec:
         - name: NODE_ENV
           value: "production"
         - name: NEXT_PUBLIC_API_GATEWAY_URL
-          value: "http://api-gateway:8001"
+          value: "http://34.7.237.224:30080"
         - name: NEXT_PUBLIC_KEYCLOAK_URL
-          value: "http://keycloak:8080"
+          value: "http://34.7.237.224:30081"
         - name: NEXT_PUBLIC_USER_MANAGEMENT_URL
-          value: "http://user-management-service:8002/api/UserManagement"
+          value: "http://34.7.237.224:30080/api/UserManagement"
         - name: NEXT_PUBLIC_POST_SERVICE_URL
-          value: "http://post-service:8003/api/Post"
+          value: "http://34.7.237.224:30080/api/Post"
         - name: NEXT_PUBLIC_COMMENT_SERVICE_URL
-          value: "http://comment-service:8004/api/Comment"
+          value: "http://34.7.237.224:30080/api/Comment"
         - name: NEXT_PUBLIC_REGISTRATION_URL
-          value: "http://registration-service:8005/api/Registration"
+          value: "http://34.7.237.224:30080/api/Registration"
         resources:
           requests:
             memory: "128Mi"
