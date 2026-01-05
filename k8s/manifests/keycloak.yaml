@@ -39,7 +39,7 @@ spec:
         - name: POSTGRES_USER
           value: "keycloak"
         - name: POSTGRES_PASSWORD
-          value: "secret"
+          value: "CHANGE_ME_BEFORE_DEPLOYMENT"
         volumeMounts:
         - name: postgres-storage
           mountPath: /var/lib/postgresql/data
@@ -86,7 +86,7 @@ spec:
         - name: KEYCLOAK_ADMIN
           value: "admin"
         - name: KEYCLOAK_ADMIN_PASSWORD
-          value: "admin"
+          value: "CHANGE_ME_BEFORE_DEPLOYMENT"
         - name: KC_DB
           value: "postgres"
         - name: KC_DB_URL_HOST
@@ -96,7 +96,7 @@ spec:
         - name: KC_DB_USERNAME
           value: "keycloak"
         - name: KC_DB_PASSWORD
-          value: "secret"
+          value: "CHANGE_ME_BEFORE_DEPLOYMENT"
         - name: KC_HEALTH_ENABLED
           value: "true"
         - name: KC_HTTP_ENABLED
