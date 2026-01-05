@@ -24,10 +24,10 @@ spec:
         resources:
           requests:
             memory: "256Mi"
-            cpu: "200m"
+            cpu: "50m"
           limits:
-            memory: "512Mi"
-            cpu: "500m"
+            memory: "256Mi"
+            cpu: "200m"
 ---
 # API Gateway Service
 apiVersion: v1
